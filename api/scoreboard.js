@@ -13,10 +13,11 @@ function getCurrentPeriod() {
 }
 
 
+// Aylık Sıralama
 router.get('/monthly', async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT u.id AS user_id, u.first_name, u.last_name, s.monthly_points
+            `SELECT u.id AS user_id, u.first_name, u.last_name, u.username, s.monthly_points
              FROM user_scores s
              JOIN users u ON u.id = s.user_id
              ORDER BY s.monthly_points DESC
@@ -29,12 +30,11 @@ router.get('/monthly', async (req, res) => {
     }
 });
 
-
-
+// Sezonluk Sıralama
 router.get('/seasonal', async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT u.id AS user_id, u.first_name, u.last_name, s.seasonal_points
+            `SELECT u.id AS user_id, u.first_name, u.last_name, u.username, s.seasonal_points
              FROM user_scores s
              JOIN users u ON u.id = s.user_id
              ORDER BY s.seasonal_points DESC
@@ -46,6 +46,7 @@ router.get('/seasonal', async (req, res) => {
         res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
+
 
 
 
