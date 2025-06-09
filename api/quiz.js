@@ -48,8 +48,8 @@ router.post('/submit', authenticateToken, async (req, res) => {
     const answers = req.body.answers; // [{quiz_id, selected_option}]
     const currentWeek = getCurrentWeekNumber();
 
-    if (!Array.isArray(answers) || answers.length !== 10) {
-        return res.status(400).json({ error: '10 adet cevap gönderilmelidir' });
+    if (!Array.isArray(answers) || answers.length === 0) {
+        return res.status(400).json({ error: 'Cevaplar eksik veya hatalı' });
     }
 
     // Puan ayarı
@@ -58,19 +58,29 @@ router.post('/submit', authenticateToken, async (req, res) => {
     );
     const pointPerCorrect = parseInt(setting[0]?.value || '0');
 
+    // Tüm doğru cevapları al
+    const [correctAnswers] = await pool.query(
+        `SELECT id, correct_option FROM quizzes WHERE id IN (?)`,
+        [answers.map(ans => ans.quiz_id)]
+    );
+
+    const correctMap = {};
+    correctAnswers.forEach(q => {
+        correctMap[q.id] = q.correct_option;
+    });
+
     let correctCount = 0;
+    let processedCount = 0;
 
     for (const answer of answers) {
         const { quiz_id, selected_option } = answer;
+        const correct_option = correctMap[quiz_id];
 
-        const [quiz] = await pool.query(
-            `SELECT correct_option FROM quizzes WHERE id = ?`,
-            [quiz_id]
-        );
-        if (quiz.length === 0) continue;
+        if (!correct_option) continue;
 
-        const is_correct = (quiz[0].correct_option === selected_option);
+        const is_correct = (selected_option === correct_option);
         if (is_correct) correctCount++;
+        processedCount++;
 
         await pool.query(
             `INSERT INTO quiz_answers (user_id, quiz_id, selected_option, is_correct, quiz_week)
@@ -79,7 +89,20 @@ router.post('/submit', authenticateToken, async (req, res) => {
         );
     }
 
-    // user_scores tablosuna ekle/güncelle
+    // Yanıtlanmayan sorulara "boş/yanlış" olarak kayıt ekleyelim
+    const unansweredIds = Object.keys(correctMap).filter(
+        id => !answers.find(ans => ans.quiz_id == id)
+    );
+
+    for (const missingId of unansweredIds) {
+        await pool.query(
+            `INSERT INTO quiz_answers (user_id, quiz_id, selected_option, is_correct, quiz_week)
+             VALUES (?, ?, ?, ?, ?)`,
+            [user_id, missingId, null, false, currentWeek]
+        );
+    }
+
+    // Puan kaydını güncelle
     await pool.query(
         `INSERT INTO user_scores (user_id, quiz_points)
          VALUES (?, ?)
@@ -91,11 +114,10 @@ router.post('/submit', authenticateToken, async (req, res) => {
         success: true,
         message: 'Quiz tamamlandı',
         correct: correctCount,
-        wrong: 10 - correctCount,
+        wrong: Object.keys(correctMap).length - correctCount,
         earned: correctCount * pointPerCorrect
     });
 });
-
 
 
 module.exports = router;
