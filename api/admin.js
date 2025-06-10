@@ -12,6 +12,7 @@ function checkAdmin(req, res, next) {
 }
 
 
+
 // Quiz Ekle
 router.post('/quiz', authenticateToken, checkAdmin, async (req, res) => {
     const { question, option_a, option_b, option_c, option_d, correct_option, image_url } = req.body;
