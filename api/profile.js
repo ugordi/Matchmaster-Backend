@@ -175,4 +175,37 @@ router.delete('/favorite-news/:news_id', authenticateToken, async (req, res) => 
 });
 
 
+router.get('/favorite-news', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const [rows] = await pool.query(
+      `SELECT news_id FROM user_favorite_news WHERE user_id = ?`,
+      [userId]
+    );
+    const newsIds = rows.map(row => row.news_id);
+    res.json({ success: true, news_ids: newsIds });
+  } catch (err) {
+    console.error("Favori haberler alınırken hata:", err);
+    res.status(500).json({ success: false, message: "Sunucu hatası." });
+  }
+});
+
+
+
+router.get('/favorite-teams', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const [rows] = await pool.query(
+      `SELECT team_id FROM user_favorite_teams WHERE user_id = ?`,
+      [userId]
+    );
+    const teamIds = rows.map(row => row.team_id);
+    res.json({ success: true, team_ids: teamIds });
+  } catch (err) {
+    console.error("Favori takımlar alınırken hata:", err);
+    res.status(500).json({ success: false, message: "Sunucu hatası." });
+  }
+});
+
+
 module.exports = router;
