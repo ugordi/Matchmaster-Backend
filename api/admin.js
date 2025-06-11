@@ -436,6 +436,78 @@ router.get('/settings', authenticateToken, checkAdmin, async (req, res) => {
 });
 
 
+// ✅ Maçı bitir, skorları gir, sonucu güncelle, doğru tahmincilere puan ver
+router.post('/finish-match', authenticateToken, async (req, res) => {
+    try {
+        const { match_id, home_score, away_score } = req.body;
+
+        if (home_score === undefined || away_score === undefined) {
+            return res.status(400).json({ error: 'Skorlar eksik' });
+        }
+
+        // Maçı bitmiş olarak güncelle
+        await pool.query(
+            `UPDATE matches SET home_score = ?, away_score = ?, status = 'finished' WHERE id = ?`,
+            [home_score, away_score, match_id]
+        );
+
+        // Gerçek sonucu belirle
+        let actual_result;
+        if (home_score > away_score) actual_result = 'home_team';
+        else if (home_score < away_score) actual_result = 'away_team';
+        else actual_result = 'draw';
+
+        // Ayarlardan puanı çek
+        const [settings] = await pool.query(
+            `SELECT value FROM system_settings WHERE name = 'correct_prediction_point'`
+        );
+        const predictionPoint = parseInt(settings[0]?.value || '0');
+
+        // Doğru tahmin yapan kullanıcıları bul
+        const [correctPredictions] = await pool.query(
+            `SELECT user_id FROM predictions WHERE match_id = ? AND predicted_result = ? AND is_correct IS NULL`,
+            [match_id, actual_result]
+        );
+
+        // Tahmin sonuçlarını güncelle (doğru/yanlış)
+        await pool.query(
+            `UPDATE predictions SET is_correct = (predicted_result = ?) WHERE match_id = ? AND is_correct IS NULL`,
+            [actual_result, match_id]
+        );
+
+        const now = new Date();
+        const month = now.getMonth() + 1;
+        const year = now.getFullYear();
+        const season_year = month >= 8 ? year : year - 1;
+
+        // Her doğru tahminciye puan ver
+        for (const { user_id } of correctPredictions) {
+            const userId = user_id;
+
+            // user_scores güncelle (monthly + seasonal)
+            await pool.query(
+                `INSERT INTO user_scores (user_id, monthly_points, seasonal_points)
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                    monthly_points = monthly_points + VALUES(monthly_points),
+                    seasonal_points = seasonal_points + VALUES(seasonal_points)`,
+                [userId, predictionPoint, predictionPoint]
+            );
+
+            // Geçmişe kaydet
+            await pool.query(
+                `INSERT INTO user_score_history (user_id, source, points, month, year, season_year)
+                 VALUES (?, 'prediction', ?, ?, ?, ?)`,
+                [userId, predictionPoint, month, year, season_year]
+            );
+        }
+
+        res.json({ success: true, message: 'Maç bitirildi, puanlar dağıtıldı' });
+    } catch (err) {
+        console.error('Maçı bitirme hatası:', err);
+        res.status(500).json({ error: 'Sunucu hatası' });
+    }
+});
 
 
 module.exports = router;

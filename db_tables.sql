@@ -218,3 +218,5 @@ CREATE TABLE user_ips (
 
 ALTER TABLE news
 ADD COLUMN image_url VARCHAR(500);
+
+ALTER TABLE user_scores ADD COLUMN quiz_points INT DEFAULT 0;
