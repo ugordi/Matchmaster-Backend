@@ -116,4 +116,26 @@ router.get("/site-statistics", async (req, res) => {
 });
 
 
+// ✅ Son 7 gün içerisindeki haberleri getir
+router.get("/news/recent", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT n.id, n.title, n.content, n.created_at,
+              n.image_url,
+              n.league_id,
+              l.name AS league_name
+       FROM news n
+       LEFT JOIN leagues l ON n.league_id = l.id
+       WHERE n.created_at >= NOW() - INTERVAL 7 DAY
+       ORDER BY n.created_at DESC`
+    );
+    res.json({ success: true, news: rows });
+  } catch (err) {
+    console.error("Son 7 günlük haberler hatası:", err);
+    res.status(500).json({ error: "Sunucu hatası" });
+  }
+});
+
+
+
 module.exports = router;
