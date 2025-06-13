@@ -220,3 +220,7 @@ ALTER TABLE news
 ADD COLUMN image_url VARCHAR(500);
 
 ALTER TABLE user_scores ADD COLUMN quiz_points INT DEFAULT 0;
+
+ALTER TABLE users
+ADD COLUMN verification_code VARCHAR(10),
+ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;

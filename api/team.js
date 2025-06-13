@@ -14,7 +14,7 @@ router.get('/search', async (req, res) => {
         const [teams] = await pool.query(
             `SELECT id, name, logo_url 
              FROM teams 
-             WHERE name LIKE ? 
+             WHERE LOWER(name) LIKE LOWER(?) 
              ORDER BY name ASC
              LIMIT 10`,
             [`%${q}%`]
@@ -58,5 +58,36 @@ router.get('/:id', async (req, res) => {
         res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
+
+// Takıma ait tüm maçları getir
+router.get('/:teamId/matches', async (req, res) => {
+  const { teamId } = req.params;
+
+  try {
+    const [matches] = await pool.query(`
+        SELECT 
+        m.id,
+        m.match_date,
+        m.status,
+        m.home_score,
+        m.away_score,
+        ht.name AS home_team,
+        at.name AS away_team,
+        ht.logo_url AS home_logo,
+        at.logo_url AS away_logo
+        FROM matches m
+        JOIN teams ht ON m.home_team = ht.name
+        JOIN teams at ON m.away_team = at.name
+        WHERE ht.id = ? OR at.id = ?
+        ORDER BY m.match_date DESC
+    `, [teamId, teamId]);
+
+    res.json({ matches });
+  } catch (err) {
+    console.error('Takım maçları alınamadı:', err);
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
+
 
 module.exports = router;

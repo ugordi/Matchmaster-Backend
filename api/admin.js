@@ -332,14 +332,47 @@ router.put('/quiz/:id', authenticateToken, checkAdmin, async (req, res) => {
 
 
 
-// Maç Ekle
+// Maç Ekleme (Tüm alanlarla birlikte)
 router.post('/matches', authenticateToken, checkAdmin, async (req, res) => {
-    const { home_team, away_team, match_date } = req.body;
-    await pool.query(
-        `INSERT INTO matches (home_team, away_team, match_date) VALUES (?, ?, ?)`,
-        [home_team, away_team, match_date]
-    );
-    res.json({ success: true });
+  const {
+    home_team,
+    away_team,
+    match_date,
+    home_score,
+    away_score,
+    status,
+    match_week,
+    league_id
+  } = req.body;
+
+  try {
+    await pool.query(`
+      INSERT INTO matches (
+        home_team,
+        away_team,
+        match_date,
+        home_score,
+        away_score,
+        status,
+        match_week,
+        league_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      home_team,
+      away_team,
+      match_date,
+      home_score || null,
+      away_score || null,
+      status || 'upcoming',
+      match_week || null,
+      league_id || null
+    ]);
+
+    res.json({ success: true, message: "Maç başarıyla eklendi." });
+  } catch (error) {
+    console.error("Maç ekleme hatası:", error);
+    res.status(500).json({ success: false, message: "Maç eklenemedi." });
+  }
 });
 
 // Sistem Tahmini Ekle
@@ -508,6 +541,37 @@ router.post('/finish-match', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Sunucu hatası' });
     }
 });
+
+// Tahminleri maç bazında getir
+router.get('/predictions/:match_id', authenticateToken, checkAdmin, async (req, res) => {
+  const matchId = req.params.match_id;
+
+  try {
+    const [rows] = await pool.query(`
+      SELECT p.id, u.username, p.predicted_result AS prediction
+      FROM predictions p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.match_id = ?
+    `, [matchId]);
+
+    const total = rows.length || 1;
+    const home = rows.filter(r => r.prediction === 'home_team').length;
+    const draw = rows.filter(r => r.prediction === 'draw').length;
+    const away = rows.filter(r => r.prediction === 'away_team').length;
+
+    const summary = {
+      home_win: Math.round((home / total) * 100),
+      draw: Math.round((draw / total) * 100),
+      away_win: Math.round((away / total) * 100),
+    };
+
+    res.json({ predictions: rows, summary });
+  } catch (err) {
+    console.error('Tahmin verisi alınamadı:', err);
+    res.status(500).json({ success: false, message: 'Tahmin verisi alınamadı' });
+  }
+});
+
 
 
 module.exports = router;

@@ -57,14 +57,14 @@ router.get('/:userId', authenticateToken, async (req, res) => {
 
     try {
         const [predictions] = await pool.query(
-            `SELECT p.id, m.home_team, m.away_team, m.match_date,
+            `SELECT p.id, p.match_id, m.home_team, m.away_team, m.match_date,
                     p.predicted_result, p.is_correct
-             FROM predictions p
-             JOIN matches m ON p.match_id = m.id
-             WHERE p.user_id = ?
-             ORDER BY m.match_date DESC`,
+            FROM predictions p
+            JOIN matches m ON p.match_id = m.id
+            WHERE p.user_id = ?
+            ORDER BY m.match_date DESC`,
             [userId]
-        );
+            );
 
         res.json(predictions);
     } catch (err) {

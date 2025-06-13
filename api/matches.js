@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const authenticateToken = require('../middleware/authMiddleware');
+
 
 // Belirli tarih aralığındaki maçları tahmin oranlarıyla birlikte getir
 router.get('/', async (req, res) => {
@@ -43,14 +45,23 @@ router.get("/week/:weekNumber", async (req, res) => {
   const { league_id } = req.query;
   try {
     const [matches] = await pool.query(
-      `SELECT m.*, s.home_win_probability, s.draw_probability, s.away_win_probability,
-              ht.logo_url AS home_logo, at.logo_url AS away_logo
-       FROM matches m
-       LEFT JOIN match_predictions_system s ON m.id = s.match_id
-       LEFT JOIN teams ht ON m.home_team = ht.name
-       LEFT JOIN teams at ON m.away_team = at.name
-       WHERE m.match_week = ? AND (? IS NULL OR m.league_id = ?)
-       ORDER BY m.match_date ASC`,
+            `SELECT 
+            m.id AS id, -- 🔥 ÖNEMLİ: id olarak gelsin
+            m.*,
+            s.home_win_probability,
+            s.draw_probability,
+            s.away_win_probability,
+            ht.logo_url AS home_logo,
+            at.logo_url AS away_logo,
+            ht.id AS home_team_id,
+            at.id AS away_team_id
+          FROM matches m
+          LEFT JOIN match_predictions_system s ON m.id = s.match_id
+          LEFT JOIN teams ht ON m.home_team = ht.name
+          LEFT JOIN teams at ON m.away_team = at.name
+          WHERE m.match_week = ? AND (? IS NULL OR m.league_id = ?)
+          ORDER BY m.match_date ASC
+`,
       [weekNumber, league_id, league_id]
     );
     res.json({ success: true, matches });
@@ -83,6 +94,31 @@ router.get("/last-week/:league_id", async (req, res) => {
   } catch (err) {
     console.error("Son hafta çekilirken hata:", err);
     res.status(500).json({ error: "Sunucu hatası" });
+  }
+});
+
+
+// ✅ 4. Belirli maç için kullanıcının tahminini getir
+router.get('/match/:matchId', authenticateToken, async (req, res) => {
+  const { matchId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    const [prediction] = await pool.query(
+      `SELECT predicted_result
+       FROM predictions
+       WHERE user_id = ? AND match_id = ?`,
+      [userId, matchId]
+    );
+
+    if (prediction.length === 0) {
+      return res.json({ success: true, predicted_result: null });
+    }
+
+    res.json({ success: true, predicted_result: prediction[0].predicted_result });
+  } catch (err) {
+    console.error('Tekil tahmin getirme hatası:', err);
+    res.status(500).json({ error: 'Sunucu hatası' });
   }
 });
 
