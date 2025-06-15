@@ -45,26 +45,35 @@ router.get("/week/:weekNumber", async (req, res) => {
   const { league_id } = req.query;
   try {
     const [matches] = await pool.query(
-            `SELECT 
-            m.id AS id, -- 🔥 ÖNEMLİ: id olarak gelsin
-            m.*,
-            s.home_win_probability,
-            s.draw_probability,
-            s.away_win_probability,
-            ht.logo_url AS home_logo,
-            at.logo_url AS away_logo,
-            ht.id AS home_team_id,
-            at.id AS away_team_id
-          FROM matches m
-          LEFT JOIN match_predictions_system s ON m.id = s.match_id
-          LEFT JOIN teams ht ON m.home_team = ht.name
-          LEFT JOIN teams at ON m.away_team = at.name
-          WHERE m.match_week = ? AND (? IS NULL OR m.league_id = ?)
-          ORDER BY m.match_date ASC
-`,
+      `SELECT 
+          m.id AS id,
+          m.*,
+          s.home_win_probability,
+          s.draw_probability,
+          s.away_win_probability,
+          ht.logo_url AS home_logo,
+          at.logo_url AS away_logo,
+          ht.id AS home_team_id,
+          at.id AS away_team_id
+        FROM matches m
+        LEFT JOIN match_predictions_system s ON m.id = s.match_id
+        LEFT JOIN teams ht ON m.home_team = ht.name
+        LEFT JOIN teams at ON m.away_team = at.name
+        WHERE m.match_week = ? AND (? IS NULL OR m.league_id = ?)
+        ORDER BY m.match_date ASC
+      `,
       [weekNumber, league_id, league_id]
     );
-    res.json({ success: true, matches });
+    // 🔥 Duplicate id’leri filtrele
+    const uniqueMatches = [];
+    const seen = new Set();
+    for (const match of matches) {
+      if (!seen.has(match.id)) {
+        uniqueMatches.push(match);
+        seen.add(match.id);
+      }
+    }
+    res.json({ success: true, matches: uniqueMatches });
   } catch (err) {
     console.error("Maçları çekerken hata:", err);
     res.status(500).json({ error: "Sunucu hatası" });

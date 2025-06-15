@@ -33,9 +33,9 @@ router.get('/available', authenticateToken, async (req, res) => {
   const currentWeek = getCurrentWeekNumber();
 
   const [solved] = await pool.query(
-    `SELECT quiz_id FROM quiz_answers WHERE user_id = ? AND quiz_week = ? AND selected_option IS NOT NULL`,
-    [user_id, currentWeek]
-    );
+    `SELECT quiz_id FROM quiz_answers WHERE user_id = ? AND selected_option IS NOT NULL`,
+    [user_id]
+  );
   const solvedIds = solved.map(row => row.quiz_id);
 
   let query = `

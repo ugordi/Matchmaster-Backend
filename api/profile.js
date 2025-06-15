@@ -38,9 +38,15 @@ router.get('/', authenticateToken, async (req, res) => {
         );
 
         const [[quizStatus]] = await pool.query(
-            'SELECT COUNT(*) AS count FROM quiz_answers WHERE user_id = ? AND quiz_week = ?',
+            'SELECT COUNT(*) AS count FROM quiz_answers WHERE user_id = ? AND quiz_week = ? AND selected_option IS NOT NULL',
             [userId, currentWeek]
         );
+
+        const [[quizSolvedThisWeek]] = await pool.query(
+            'SELECT COUNT(*) AS count FROM quiz_answers WHERE user_id = ? AND quiz_week = ? AND selected_option IS NOT NULL',
+            [userId, currentWeek]
+            );
+
 
         const [[predStats]] = await pool.query(
             `SELECT COUNT(*) AS total, SUM(is_correct = 1) AS correct
@@ -76,10 +82,12 @@ router.get('/', authenticateToken, async (req, res) => {
             [userId]
         );
 
+         console.log("UserID:", userId, "CurrentWeek:", currentWeek, "QuizSolvedThisWeek:", quizSolvedThisWeek.count);
+         
         res.json({
             user,
             scores,
-            quizAvailable: quizStatus.count === 0,
+            quizAvailable: quizSolvedThisWeek.count === 0,
             predictionStats: {
                 total: predStats.total,
                 correct: predStats.correct,
