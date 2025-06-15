@@ -573,6 +573,54 @@ router.get('/predictions/:match_id', authenticateToken, checkAdmin, async (req, 
 });
 
 
+// Sistemin tüm tahminlerini ve maç detaylarını getirir (pagination destekli)
+router.get("/system-predictions", async (req, res) => {
+  try {
+    // Pagination parametreleri (varsayılan: 1. sayfa, 10 kayıt)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    // Toplam tahmin sayısı
+    const [countResult] = await pool.query(`
+      SELECT COUNT(*) AS total
+      FROM match_predictions_system
+    `);
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    // Maçlar ve oranlar ile birlikte çek
+    const [results] = await pool.query(`
+      SELECT 
+        mps.id,
+        mps.match_id,
+        mps.home_win_probability,
+        mps.draw_probability,
+        mps.away_win_probability,
+        mps.created_at,
+        mat.home_team,
+        mat.away_team,
+        mat.match_date,
+        mat.match_week,
+        mat.league_id
+      FROM match_predictions_system mps
+      JOIN matches mat ON mat.id = mps.match_id
+      ORDER BY mps.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    res.json({
+      system_predictions: results,
+      page,
+      totalPages,
+      total
+    });
+  } catch (err) {
+    console.error("Sistem tahminleri çekilemedi:", err);
+    res.status(500).json({ error: "Bir hata oluştu." });
+  }
+});
+
 
 module.exports = router;
 
