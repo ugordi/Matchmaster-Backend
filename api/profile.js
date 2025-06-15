@@ -82,7 +82,6 @@ router.get('/', authenticateToken, async (req, res) => {
             [userId]
         );
 
-         console.log("UserID:", userId, "CurrentWeek:", currentWeek, "QuizSolvedThisWeek:", quizSolvedThisWeek.count);
          
         res.json({
             user,
